@@ -36,7 +36,7 @@ const CONFIG = {
   checkTimeoutInterval: 180000
 };
 
-const BOT_USERNAME = 'accesscontrol';
+const BOT_USERNAME = 'RFLIX500KsBot';
 const AUTHME_PASSWORD = process.env.AUTHME_PASSWORD || 'deutschland';
 
 let bot;
