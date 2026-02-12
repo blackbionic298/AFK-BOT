@@ -36,8 +36,8 @@ const CONFIG = {
   checkTimeoutInterval: 180000
 };
 
-const BOT_USERNAME = 'RFLIX500KsBot';
-const AUTHME_PASSWORD = process.env.AUTHME_PASSWORD || 'deutschland';
+const BOT_USERNAME = 'reflix';
+const AUTHME_PASSWORD = process.env.AUTHME_PASSWORD || 'deutsch_land';
 
 let bot;
 let jumpInterval;
