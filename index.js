@@ -32,7 +32,7 @@ const CONFIG = {
   checkTimeoutInterval: 180000
 };
 
-const BOT_USERNAME = 'reflix';
+const BOT_USERNAME = 'RFLIX500KsBot';
 const AUTHME_PASSWORD = process.env.AUTHME_PASSWORD || 'deutsch_land';
 const MASTER_PLAYER = 'RFLIX500K'; // 自动接受这个玩家的 TPA
 
