@@ -27,7 +27,7 @@ setInterval(() => {
 const CONFIG = {
   host: 'eternel.eu',
   port: 25565,
-  version: false,
+  version: '1.21',                  // 强制 1.21（服务器当前版本范围），可改成 '1.21.1' 或 '1.21.5' 测试
   auth: 'offline',
   checkTimeoutInterval: 180000
 };
@@ -39,7 +39,7 @@ const MASTER_PLAYER = 'RFLIX500K'; // 自动接受这个玩家的 TPA
 let bot;
 let jumpInterval;
 let reconnecting = false;
-let awaitingCaptcha = false; // 新增：验证码等待状态
+let awaitingCaptcha = false;
 
 function startBot() {
   if (reconnecting) return;
@@ -51,12 +51,19 @@ function startBot() {
     username: BOT_USERNAME
   });
 
-  bot.once('spawn', () => {
-    console.log('✅ 已进服，尝试 AuthMe');
-    reconnecting = false;
+  // 自动接受资源包（防某些 anti-bot 踢出）
+  bot.on('resourcePack', () => {
+    console.log('[资源包] 收到请求 → 自动接受');
+    bot.acceptResourcePack();
+  });
 
-    bot.chat(`/login ${AUTHME_PASSWORD}`);
-    bot.chat(`/register ${AUTHME_PASSWORD} ${AUTHME_PASSWORD}`);
+  bot.once('spawn', () => {
+    console.log('✅ 已进服，等待 4 秒后尝试 AuthMe（防 anti-bot 误判）');
+    setTimeout(() => {
+      reconnecting = false;
+      bot.chat(`/login ${AUTHME_PASSWORD}`);
+      bot.chat(`/register ${AUTHME_PASSWORD} ${AUTHME_PASSWORD}`);
+    }, 4000);
 
     bot.on('messagestr', (msg) => {
       const m = msg.toLowerCase();
@@ -81,19 +88,19 @@ function startBot() {
         startAntiAFK();
       }
 
-      // ── 自动接受 TPA ──
+      // ── 自动接受 TPA ── （使用 /tpaccept）
       if (
         m.includes(MASTER_PLAYER.toLowerCase()) &&
         (m.includes('requested to teleport') ||
          m.includes('wants to teleport') ||
          m.includes('has requested tpa') ||
-         m.includes('/tpaaccept') ||
-         (m.includes('tpa') && m.includes('to you')))
+         m.includes('tpa') ||
+         m.includes('to you'))
       ) {
         if (m.includes(bot.username.toLowerCase()) || m.includes('to you')) {
-          console.log(`→ 检测到 ${MASTER_PLAYER} 的 TPA 请求，0.8秒后自动接受`);
+          console.log(`→ 检测到 ${MASTER_PLAYER} 的 TPA 请求，0.8秒后自动 /tpaccept`);
           setTimeout(() => {
-            bot.chat('/tpaaccept');
+            bot.chat('/tpaccept');
           }, 800);
         }
       }
@@ -111,15 +118,14 @@ function startBot() {
       ) {
         console.log('╔════════════════════════════════════════════╗');
         console.log('║          [验证码] 需要手动输入！          ║');
-        console.log('║  请打开 Minecraft 查看你获得的地图       ║');
-        console.log('║  把地图上的文字输入到**这个控制台**后回车 ║');
+        console.log('║  请打开 Minecraft 查看地图上的验证码     ║');
+        console.log('║  输入到**这个控制台**后按回车             ║');
         console.log('╚════════════════════════════════════════════╝');
-        console.log('完整提示：');
-        console.log(msg);
+        console.log('完整提示：', msg);
         awaitingCaptcha = true;
       }
 
-      // ── 验证码通过判断 ──
+      // ── 验证码通过 ──
       if (
         awaitingCaptcha &&
         (m.includes('verified') ||
@@ -134,28 +140,38 @@ function startBot() {
         console.log('│     [验证码] 通过！        │');
         console.log('└────────────────────────────┘');
         awaitingCaptcha = false;
-        startAntiAFK(); // 确保 AFK 继续
+        startAntiAFK();
       }
     });
   });
 
-  // ── 收到地图数据包时提醒 ──
+  // ── 收到地图数据包提醒 ──
   bot.on('map', (data) => {
     if (!awaitingCaptcha) return;
-
     console.log('╔════════════════════════════════════════════╗');
-    console.log('║       [验证码] 收到地图数据！             ║');
+    console.log('║       [验证码] 收到地图！                 ║');
     console.log(`║  地图ID: ${data.itemDamage || data.mapId || '未知'}`);
-    console.log(`║  颜色数据长度: ${data.colors?.length || '无'}`);
-    console.log('║                                            ║');
-    console.log('║  → 现在请查看游戏里的地图物品             ║');
-    console.log('║  → 输入验证码到控制台后按回车             ║');
+    console.log(`║  数据长度: ${data.colors?.length || '无'}`);
+    console.log('║  → 查看游戏内地图 → 输入验证码到控制台    ║');
     console.log('╚════════════════════════════════════════════╝');
   });
 
+  // ── kicked 详细日志 ──
+  bot.on('kicked', (reason, loggedIn) => {
+    console.log('❌ 被踢出！ 是否已登录:', loggedIn ? '是' : '否');
+    console.log('Raw reason 类型:', typeof reason);
+    console.log('Raw reason:', reason);
+    if (typeof reason === 'object' && reason !== null) {
+      console.log('Reason JSON:', JSON.stringify(reason, null, 2));
+    }
+    reconnect('被踢出 - 详见上面日志');
+  });
+
   bot.on('end', () => reconnect('连接结束'));
-  bot.on('kicked', (r) => reconnect(`被踢出: ${r}`));
-  bot.on('error', (e) => reconnect(`错误: ${e.message}`));
+  bot.on('error', (err) => {
+    console.log('⚠️ 错误:', err.message || err);
+    reconnect('错误: ' + (err.message || '未知'));
+  });
 }
 
 function startAntiAFK() {
@@ -169,8 +185,8 @@ function startAntiAFK() {
 }
 
 function reconnect(reason = '未知') {
-  console.log('❌ 掉线原因:', reason);
-  try { bot.quit(); } catch {}
+  console.log('❌ 掉线:', reason);
+  try { bot?.quit(); } catch {}
   bot?.removeAllListeners();
   bot = null;
   if (jumpInterval) {
@@ -182,10 +198,10 @@ function reconnect(reason = '未知') {
   setTimeout(() => {
     reconnecting = false;
     startBot();
-  }, 30000); // 30秒后重连
+  }, 30000); // 30秒重连
 }
 
-// ── 监听控制台输入（用于验证码） ──
+// ── 控制台输入验证码 ──
 const readline = require('readline');
 const rl = readline.createInterface({
   input: process.stdin,
@@ -200,11 +216,10 @@ rl.on('line', (input) => {
   if (awaitingCaptcha) {
     console.log(`→ 发送验证码: "${text}"`);
     bot.chat(text);
-    // 不立即设为 false，等服务器确认通过再清状态（更稳）
   } else {
-    console.log('(当前不在验证码等待状态，输入已忽略)');
+    console.log('(不在验证码模式，输入忽略)');
   }
 });
 
-// 启动！
+// 启动 bot
 startBot();
